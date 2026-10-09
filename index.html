@@ -132,6 +132,7 @@
     <div class="word-row">
       <div class="slots" id="slots"></div>
       <button id="btnConfirm" class="primary">단어 확정</button>
+      <button id="btnCancel" class="danger" hidden>배치 취소</button>
     </div>
     <div class="preview" id="preview"></div>
     <div class="rack" id="rack"></div>
@@ -2738,7 +2739,7 @@ const UI = (() => {
   const $ = (id) => document.getElementById(id);
   const el = {
     wave: $('hudWave'), lives: $('hudLives'), gold: $('hudGold'), enemies: $('hudEnemies'),
-    btnWave: $('btnWave'), btnSpeed: $('btnSpeed'), btnConfirm: $('btnConfirm'),
+    btnWave: $('btnWave'), btnSpeed: $('btnSpeed'), btnConfirm: $('btnConfirm'), btnCancel: $('btnCancel'),
     btnClear: $('btnClear'), btnShuffle: $('btnShuffle'), btnReroll: $('btnReroll'),
     slots: $('slots'), preview: $('preview'), rack: $('rack'), info: $('info'),
     overlay: $('overlay'), overlayText: $('overlayText'), btnRestart: $('btnRestart'),
@@ -2873,7 +2874,7 @@ const UI = (() => {
     const word = composedWord();
     if (state.pending) {
       const s = state.pending.spec;
-      el.preview.innerHTML = `<span class="ok">${s.icon} <b>${s.word}</b> 배치 대기 중</span> — 맵의 빈 칸을 클릭하세요 (우클릭/Esc 취소)`;
+      el.preview.innerHTML = `<span class="ok">${s.icon} <b>${s.word}</b> 배치 대기 중</span> — 맵의 빈 칸을 탭하세요 (취소: 배치 취소 버튼 · 우클릭 · Esc)`;
     } else if (!word) {
       el.preview.innerHTML = '';
     } else {
@@ -2886,6 +2887,9 @@ const UI = (() => {
       }
     }
     el.btnConfirm.disabled = !!state.pending || !word;
+    // 배치 대기 중에는 '단어 확정' 대신 '배치 취소'를 보여준다 (터치 기기에는 우클릭/Esc가 없음)
+    el.btnConfirm.hidden = !!state.pending;
+    el.btnCancel.hidden = !state.pending;
   }
 
   function specSummary(s) {
@@ -2961,6 +2965,7 @@ const UI = (() => {
     });
 
     el.btnConfirm.onclick = confirmWord;
+    el.btnCancel.onclick = cancelPending;
     el.btnClear.onclick = clearComposition;
     el.btnShuffle.onclick = shuffleRack;
     el.btnReroll.onclick = rerollRack;

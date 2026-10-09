@@ -77,7 +77,7 @@
   }
   .word-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
   .slots {
-    flex: 1; min-width: 200px; min-height: 52px; display: flex; gap: 4px; align-items: center;
+    flex: 1; min-width: 200px; min-height: 52px; display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
     padding: 4px 6px; border: 2px dashed var(--line); border-radius: 8px;
   }
   .slots .hint { color: var(--muted); font-size: 13px; }
@@ -94,9 +94,27 @@
   .tile .pts { position: absolute; right: 4px; bottom: 5px; font-size: 9px; font-weight: 700; }
   .tile.used { opacity: .25; }
   .tile.reserved { opacity: .25; outline: 2px solid var(--accent); }
-  .slots .tile { width: 40px; height: 40px; font-size: 20px; }
+  .slots .tile { width: 40px; height: 40px; font-size: 20px; flex-shrink: 0; }
   .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
 
+  .study {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+    margin-bottom: 8px; font-size: 14px;
+  }
+  .study select {
+    font: inherit; font-weight: 700; color: var(--text); background: var(--panel-2);
+    border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; max-width: 100%;
+  }
+  .study .progress { color: var(--muted); font-size: 13px; font-variant-numeric: tabular-nums; }
+  .hint-card {
+    display: flex; flex-wrap: wrap; align-items: center; gap: 6px 12px;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 8px 10px; margin-bottom: 8px;
+  }
+  .hint-card[hidden] { display: none; }
+  .hint-card .ko { font-size: 18px; font-weight: 800; color: var(--accent); }
+  .hint-card .pattern { white-space: pre-wrap; font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 18px; font-weight: 700; letter-spacing: 4px; }
+  .hint-card .spacer { flex: 1; }
   .legend { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.7; }
   .legend b { color: var(--text); }
   kbd { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 11px; }
@@ -129,6 +147,18 @@
 
   <!-- 단어 조합 UI -->
   <div class="composer">
+    <!-- 학습 모드: 단원 선택 + 뜻 힌트 -->
+    <div class="study">
+      <label for="unitSelect">단원</label>
+      <select id="unitSelect"></select>
+      <span class="progress" id="studyProgress"></span>
+    </div>
+    <div class="hint-card" id="hintCard" hidden>
+      <span>뜻</span><span class="ko" id="hintKo"></span>
+      <span class="pattern" id="hintPattern"></span>
+      <span class="spacer"></span>
+      <button id="btnHint">글자 힌트 (5G)</button>
+    </div>
     <div class="word-row">
       <div class="slots" id="slots"></div>
       <button id="btnConfirm" class="primary">단어 확정</button>
@@ -1780,6 +1810,29 @@ ZIRCONS ZIT ZITHER ZITHERS ZITS ZLOTIES ZLOTY ZLOTYS ZODIAC ZODIACAL ZODIACS ZOM
 ZOOMS ZOOPHYTE ZOOS ZOSTER ZOUNDS ZUCCHINI ZWIEBACK ZYDECO ZYGOTE ZYGOTES ZYGOTIC ZYMURGY
 </script>
 
+<!--
+  단원 낱말 데이터 (학습 모드)
+  출처: 초등 영어 6학년 (최희경 외, 2025 검정) 단원별 Word Pop 낱말과 뜻
+        (영어6_최_01~12_대화문 및 해석.pdf). 5단원 broke는 지도서 핵심 단어(216~251쪽)에서 보충.
+  형식: { "units": [ { "unit": 1, "title": "...", "words": [ { "en": "water", "ko": "물" } ] } ] }
+  다른 교과서/학년으로 바꾸려면 이 JSON만 교체하면 된다.
+-->
+<script id="unitdata" type="application/json">
+{"units":[
+{"unit":1,"title":"I'm in the Sixth Grade","words":[{"en":"first","ko":"첫 번째"},{"en":"second","ko":"두 번째"},{"en":"third","ko":"세 번째"},{"en":"fourth","ko":"네 번째"},{"en":"fifth","ko":"다섯 번째"},{"en":"sixth","ko":"여섯 번째"},{"en":"classroom","ko":"교실"},{"en":"floor","ko":"층"},{"en":"grade","ko":"학년"}]},
+{"unit":2,"title":"What Do You Want To Be?","words":[{"en":"astronaut","ko":"우주 비행사"},{"en":"musical actor","ko":"뮤지컬 배우"},{"en":"story writer","ko":"작가"},{"en":"zookeeper","ko":"사육사"},{"en":"job","ko":"직업"},{"en":"car designer","ko":"자동차 디자이너"},{"en":"cook","ko":"요리사"},{"en":"pianist","ko":"피아니스트"},{"en":"pilot","ko":"비행기 조종사"},{"en":"scientist","ko":"과학자"},{"en":"soccer player","ko":"축구 선수"},{"en":"dream","ko":"꿈"}]},
+{"unit":3,"title":"When Is Your Birthday?","words":[{"en":"January","ko":"1월"},{"en":"February","ko":"2월"},{"en":"March","ko":"3월"},{"en":"April","ko":"4월"},{"en":"May","ko":"5월"},{"en":"June","ko":"6월"},{"en":"July","ko":"7월"},{"en":"August","ko":"8월"},{"en":"September","ko":"9월"},{"en":"October","ko":"10월"},{"en":"November","ko":"11월"},{"en":"December","ko":"12월"},{"en":"win","ko":"이기다"}]},
+{"unit":4,"title":"What's Wrong?","words":[{"en":"cold","ko":"감기"},{"en":"fever","ko":"열"},{"en":"medicine","ko":"약"},{"en":"runny nose","ko":"콧물"},{"en":"toothache","ko":"치통"},{"en":"doctor","ko":"의사"},{"en":"drink","ko":"마시다"},{"en":"headache","ko":"두통"},{"en":"rest","ko":"휴식"}]},
+{"unit":5,"title":"Who Painted This Picture?","words":[{"en":"broke","ko":"깨뜨렸다"},{"en":"built","ko":"지었다, 건설했다"},{"en":"drew","ko":"그렸다"},{"en":"made","ko":"만들었다"},{"en":"painted","ko":"그렸다"},{"en":"wrote","ko":"썼다"},{"en":"hero","ko":"영웅"},{"en":"save","ko":"구하다"},{"en":"airplane","ko":"비행기"},{"en":"letter","ko":"글자, 문자"},{"en":"sand","ko":"모래"}]},
+{"unit":6,"title":"I'm Going to Play Soccer","words":[{"en":"do a science project","ko":"과학 프로젝트를 하다"},{"en":"play soccer","ko":"축구를 하다"},{"en":"see a soccer game","ko":"축구 경기를 보다"},{"en":"stay home","ko":"집에서 머무르다"},{"en":"visit my grandmother","ko":"할머니 댁을 방문하다"},{"en":"watch a movie","ko":"영화를 보다"},{"en":"dance","ko":"춤추다"},{"en":"do face painting","ko":"페이스 페인팅을 하다"},{"en":"do taekwondo","ko":"태권도를 하다"},{"en":"make an eco-bag","ko":"에코백을 만들다"},{"en":"sing a song","ko":"노래를 부르다"}]},
+{"unit":7,"title":"I'd Like to Have Watermelon Juice","words":[{"en":"carrot","ko":"당근"},{"en":"cheese","ko":"치즈"},{"en":"fruit","ko":"과일"},{"en":"vegetable","ko":"채소"},{"en":"watermelon","ko":"수박"},{"en":"delicious","ko":"맛있는"},{"en":"hot","ko":"매운"},{"en":"salty","ko":"짠"},{"en":"sweet","ko":"달콤한"},{"en":"beefsteak","ko":"소고기스테이크"},{"en":"chicken curry","ko":"닭고기카레"},{"en":"chocolate cake","ko":"초콜릿케이크"},{"en":"egg sandwich","ko":"달걀샌드위치"},{"en":"ice cream","ko":"아이스크림"}]},
+{"unit":8,"title":"Who Is Faster?","words":[{"en":"bigger","ko":"더 큰"},{"en":"faster","ko":"더 빠른"},{"en":"stronger","ko":"더 힘이 센"},{"en":"taller","ko":"더 키가 큰"},{"en":"heavier","ko":"더 무거운"},{"en":"longer","ko":"더 긴"},{"en":"smaller","ko":"더 작은"},{"en":"choose","ko":"선택하다"},{"en":"gray","ko":"회색(의)"},{"en":"line","ko":"선"}]},
+{"unit":9,"title":"How Can I Get to the Library?","words":[{"en":"bank","ko":"은행"},{"en":"hospital","ko":"병원"},{"en":"library","ko":"도서관"},{"en":"station","ko":"역, 정거장"},{"en":"zoo","ko":"동물원"},{"en":"by bus","ko":"버스를 타고, 버스로"},{"en":"by subway","ko":"지하철을 타고, 지하철로"},{"en":"on foot","ko":"걸어서"},{"en":"next to","ko":"~의 옆에"},{"en":"market","ko":"마켓, 시장"},{"en":"by taxi","ko":"택시를 타고, 택시로"},{"en":"by train","ko":"기차를 타고, 기차로"},{"en":"between","ko":"~의 사이[중간]에"},{"en":"in front of","ko":"~의 앞에"}]},
+{"unit":10,"title":"How Often Do You Eat Breakfast?","words":[{"en":"once","ko":"한 번, 1회"},{"en":"twice","ko":"두 번, 2회"},{"en":"often","ko":"자주"},{"en":"brush your teeth","ko":"이를 닦다"},{"en":"exercise","ko":"운동하다"},{"en":"wash your hands","ko":"손을 씻다"},{"en":"eat breakfast","ko":"아침을 먹다"},{"en":"eat fast food","ko":"패스트푸드를 먹다"}]},
+{"unit":11,"title":"Do You Know about the Space Station?","words":[{"en":"astronaut","ko":"우주 비행사"},{"en":"sleeping bag","ko":"침낭"},{"en":"space food","ko":"우주 식량"},{"en":"space station","ko":"우주 정거장"},{"en":"know","ko":"알다"},{"en":"city","ko":"도시"},{"en":"drink","ko":"음료"},{"en":"place","ko":"장소"}]},
+{"unit":12,"title":"Why Are You Happy?","words":[{"en":"worried","ko":"걱정하는"},{"en":"because","ko":"~ 때문에"},{"en":"feel","ko":"느끼다"},{"en":"same","ko":"똑같은"},{"en":"why","ko":"왜"},{"en":"present","ko":"선물"},{"en":"congratulation","ko":"축하"},{"en":"middle school","ko":"중학교"},{"en":"miss","ko":"그리워하다"}]}]}
+</script>
+
 <script>
 'use strict';
 
@@ -1936,6 +1989,80 @@ BLIZZARD TREASURE
 
 
 /* =====================================================================
+ * 2-1. StudyMode — 단원 낱말 학습 모드
+ * ---------------------------------------------------------------------
+ *  - <script id="unitdata">의 JSON(지도서 단원 낱말)을 읽는다.
+ *  - 단원을 고르면 그 단원 낱말만 정답으로 인정하고(WordValidator 'study' 규칙),
+ *    매번 '목표 낱말' 하나를 골라 한글 뜻을 힌트로 보여준다.
+ *  - 타일은 목표 낱말의 글자 + 무작위 글자로 채워 반드시 만들 수 있게 한다(UI.newPuzzle).
+ *  - 어구(play soccer 등)는 띄어쓰기를 빼고 글자만 이어서 만들게 한다.
+ *  - 글자 수가 MAX_STUDY_LEN을 넘는 낱말/어구는 타일로 만들기 너무 길어 제외.
+ * ===================================================================== */
+const MAX_STUDY_LEN = 12;   // 학습 모드에서 만들 수 있는 최대 글자 수 (랙도 그만큼 늘어남)
+
+const StudyMode = (() => {
+  let raw = { units: [] };
+  try { raw = JSON.parse(document.getElementById('unitdata').textContent); } catch (e) { /* 데이터 없음 → 자유 모드만 */ }
+
+  /** 단원 → Map<WORD, 뜻> */
+  const units = (raw.units || []).map((u) => {
+    const words = new Map();
+    for (const w of u.words || []) {
+      // 어구는 띄어쓰기·기호를 빼고 글자만 이어서 만든다 (play soccer → PLAYSOCCER)
+      const display = String(w.en || '').trim();
+      const key = display.toUpperCase().replace(/[^A-Z]/g, '');
+      if (key.length >= 2 && key.length <= MAX_STUDY_LEN && !words.has(key)) words.set(key, { ko: w.ko || '', display });
+    }
+    return { key: `u${u.unit}`, label: `${u.unit}단원 ${u.title || ''}`.trim(), words };
+  }).filter((u) => u.words.size);
+
+  const allWords = new Map();
+  for (const u of units) for (const [w, v] of u.words) if (!allWords.has(w)) allWords.set(w, v);
+
+  let active = null;          // { key, label, words } | null(자유 모드)
+  const learned = new Set();  // 이번 판에서 완성한 낱말
+  let lastTarget = null;
+
+  return {
+    /** 선택지: 자유 모드 + 전체 단원 + 단원별 */
+    options() {
+      const list = [{ key: 'free', label: '자유 모드 (모든 영단어)' }];
+      if (units.length) list.push({ key: 'all', label: `전체 단원 (${allWords.size}낱말)` });
+      for (const u of units) list.push({ key: u.key, label: `${u.label} (${u.words.size})` });
+      return list;
+    },
+    defaultKey() { return units.length ? 'all' : 'free'; },
+    select(key) {
+      learned.clear();
+      lastTarget = null;
+      if (key === 'all' && units.length) active = { key, label: '전체 단원', words: allWords };
+      else active = units.find((u) => u.key === key) ?? null;
+    },
+    get active() { return active; },
+    has(word) { return !!active && active.words.has(word); },
+    /** 어느 단원이든 등장한 낱말이면 뜻을 돌려준다 (자유 모드에서도 표시용) */
+    meaning(word) { return ((active && active.words.get(word)) || allWords.get(word) || {}).ko || ''; },
+    /** 교과서 표기 (어구는 띄어쓰기 포함) */
+    display(word) { return ((active && active.words.get(word)) || allWords.get(word) || {}).display || word; },
+    maxLen() { return active ? MAX_STUDY_LEN : CONFIG.MAX_WORD_LEN; },
+    /** 아직 완성하지 않은 낱말 중 무작위. 다 했으면 처음부터 다시 */
+    nextTarget() {
+      if (!active) return null;
+      let pool = [...active.words.keys()].filter((w) => !learned.has(w) && w !== lastTarget);
+      if (!pool.length) pool = [...active.words.keys()].filter((w) => w !== lastTarget);
+      if (!pool.length) pool = [...active.words.keys()];
+      const word = pool[(Math.random() * pool.length) | 0];
+      lastTarget = word;
+      const v = active.words.get(word);
+      return { word, ko: v.ko, display: v.display };
+    },
+    markLearned(word) { learned.add(word); },
+    progress() { return active ? { done: [...learned].filter((w) => active.words.has(w)).length, total: active.words.size } : null; },
+  };
+})();
+
+
+/* =====================================================================
  * 3. WordValidator — 규칙 파이프라인
  * ---------------------------------------------------------------------
  *  규칙은 { id, check(word, ctx) => 에러메시지 | null } 형태.
@@ -1950,11 +2077,13 @@ const WordValidator = (() => {
     {
       id: 'length',
       check: (w) =>
-        w.length < CONFIG.MIN_WORD_LEN ? `${CONFIG.MIN_WORD_LEN}글자 이상이어야 합니다` :
-        w.length > CONFIG.MAX_WORD_LEN ? `${CONFIG.MAX_WORD_LEN}글자 이하여야 합니다` : null,
+        w.length < (StudyMode.active ? 2 : CONFIG.MIN_WORD_LEN) ? `${StudyMode.active ? 2 : CONFIG.MIN_WORD_LEN}글자 이상이어야 합니다` :
+        w.length > StudyMode.maxLen() ? `${StudyMode.maxLen()}글자 이하여야 합니다` : null,
     },
     { id: 'charset',    check: (w) => /^[A-Z]+$/.test(w) ? null : '알파벳만 사용할 수 있습니다' },
-    { id: 'dictionary', check: (w) => Lexicon.has(w) ? null : '사전에 없는 단어입니다' },
+    // 학습 모드: 선택한 단원의 낱말만 인정
+    { id: 'study',      check: (w) => !StudyMode.active || StudyMode.has(w) ? null : '이번 단원 낱말이 아니에요' },
+    { id: 'dictionary', check: (w) => Lexicon.has(w) || StudyMode.has(w) ? null : '사전에 없는 단어입니다' },
   ];
 
   return {
@@ -2743,7 +2872,10 @@ const UI = (() => {
     btnClear: $('btnClear'), btnShuffle: $('btnShuffle'), btnReroll: $('btnReroll'),
     slots: $('slots'), preview: $('preview'), rack: $('rack'), info: $('info'),
     overlay: $('overlay'), overlayText: $('overlayText'), btnRestart: $('btnRestart'),
+    unitSelect: $('unitSelect'), studyProgress: $('studyProgress'),
+    hintCard: $('hintCard'), hintKo: $('hintKo'), hintPattern: $('hintPattern'), btnHint: $('btnHint'),
   };
+  const HINT_COST = 5;
 
   const state = {
     game: null,
@@ -2753,6 +2885,7 @@ const UI = (() => {
     selected: null,    // 선택된 Tower
     hover: null,       // { c, r }
     message: null,     // { html, ttl }
+    target: null,      // 학습 모드 목표 낱말 { word, ko, revealed }
   };
 
   /* ----- 랙 관리 ----- */
@@ -2772,6 +2905,46 @@ const UI = (() => {
     }
   }
 
+  /** 학습 모드: 목표 낱말 글자 + 무작위 글자로 랙을 새로 채운다 */
+  function newPuzzle() {
+    const t = StudyMode.nextTarget();
+    state.target = t ? { ...t, revealed: 1 } : null;   // 첫 글자는 처음부터 공개
+    if (!t) return;
+    const letters = t.word.split('');
+    // 랙은 기본 8칸, 긴 낱말이면 '글자 수 + 2'칸 (헷갈리게 할 여분 글자)
+    const size = Math.max(CONFIG.RACK_SIZE, letters.length + 2);
+    while (letters.length < size) letters.push(LetterBag.draw());
+    for (let i = letters.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [letters[i], letters[j]] = [letters[j], letters[i]];
+    }
+    state.rack = letters.map((l) => newTile(l));
+    state.composition = [];
+  }
+
+  /** 단원(모드) 변경 */
+  function selectUnit(key) {
+    StudyMode.select(key);
+    state.pending = null;
+    state.composition = [];
+    if (StudyMode.active) newPuzzle();
+    else {
+      state.target = null;
+      state.rack = Array.from({ length: CONFIG.RACK_SIZE }, () => newTile());
+      ensureVowels();
+    }
+    renderComposer();
+  }
+
+  function revealHint() {
+    const t = state.target;
+    if (!t || t.revealed >= t.word.length) return;
+    if (state.game.gold < HINT_COST) return flash('골드가 부족합니다.', 'err');
+    state.game.gold -= HINT_COST;
+    t.revealed++;
+    renderStudy();
+  }
+
   /** 지정한 타일들을 새 타일로 교체 (같은 슬롯 위치 유지) */
   function replaceTiles(ids) {
     const set = new Set(ids);
@@ -2784,7 +2957,7 @@ const UI = (() => {
   /* ----- 조합 동작 ----- */
   function addTile(id) {
     if (state.composition.includes(id) || reservedIds().has(id)) return;
-    if (state.composition.length >= CONFIG.MAX_WORD_LEN) return;
+    if (state.composition.length >= StudyMode.maxLen()) return;
     state.composition.push(id);
     renderComposer();
   }
@@ -2819,8 +2992,15 @@ const UI = (() => {
     if (g.gold < spec.cost) return flash(`골드가 부족합니다 (${spec.cost}G 필요)`, 'err');
     g.placeTower(spec, c, r);
     state.pending = null;
-    replaceTiles(tileIds);       // 사용한 타일 소모 → 새 타일 보충
-    flash(`${spec.icon} <b>${spec.word}</b> ${spec.name} 배치!`, 'ok');
+    if (StudyMode.active) {
+      // 학습 모드: 완성한 낱말 기록 → 뜻과 함께 칭찬 → 다음 목표 낱말로 새 퍼즐
+      StudyMode.markLearned(spec.word);
+      flash(`✓ <b>${StudyMode.display(spec.word)}</b> = ${StudyMode.meaning(spec.word)} · ${spec.icon} ${spec.name} 배치!`, 'ok');
+      newPuzzle();
+    } else {
+      replaceTiles(tileIds);     // 사용한 타일 소모 → 새 타일 보충
+      flash(`${spec.icon} <b>${spec.word}</b> ${spec.name} 배치!`, 'ok');
+    }
     renderComposer();
   }
 
@@ -2836,9 +3016,11 @@ const UI = (() => {
     const g = state.game;
     if (g.gold < CONFIG.REROLL_COST) return flash('골드가 부족합니다.', 'err');
     const locked = reservedIds();
+    if (StudyMode.active && state.pending) return flash('먼저 대기 중인 타워를 배치하거나 취소하세요.', 'err');
     g.gold -= CONFIG.REROLL_COST;
     state.composition = [];
-    replaceTiles(state.rack.filter((t) => !locked.has(t.id)).map((t) => t.id));
+    if (StudyMode.active) newPuzzle();   // 학습 모드: 다른 낱말로 건너뛰기
+    else replaceTiles(state.rack.filter((t) => !locked.has(t.id)).map((t) => t.id));
     renderComposer();
   }
 
@@ -2866,7 +3048,26 @@ const UI = (() => {
       : '<span class="hint">아래 타일을 눌러 단어를 만드세요</span>';
 
     renderPreview();
+    renderStudy();
     renderInfo();
+  }
+
+  /** 학습 모드: 뜻 힌트 카드와 진도 */
+  function renderStudy() {
+    const t = state.target;
+    el.hintCard.hidden = !t;
+    const p = StudyMode.progress();
+    el.studyProgress.textContent = p ? `완성 ${p.done} / ${p.total}` : '';
+    if (!t) return;
+    el.hintKo.textContent = t.ko || '(뜻 없음)';
+    // 교과서 표기를 따라 어구는 단어 사이를 넓게 띄운다: P _ _ _   _ _ _ _ _ _
+    let i = 0;
+    el.hintPattern.textContent = t.display.toUpperCase().split(/\s+/).map((part) =>
+      part.split('').map((ch) => (/[A-Z]/.test(ch) ? (i++ < t.revealed ? ch : '_') : ch)).join(' ')
+    ).join('   ');
+    const full = t.revealed >= t.word.length;
+    el.btnHint.disabled = full || state.game.gold < HINT_COST;
+    el.btnHint.textContent = full ? '힌트 끝' : `글자 힌트 (${HINT_COST}G)`;
   }
 
   /** 실시간 미리보기: 검증 결과 + 해석된 능력 (랙 DOM은 건드리지 않음) */
@@ -2883,7 +3084,8 @@ const UI = (() => {
         el.preview.innerHTML = `<span class="err">${word} — ${v.reason}</span>`;
       } else {
         const s = AbilityRegistry.resolve(word);
-        el.preview.innerHTML = specSummary(s);
+        const ko = StudyMode.active ? StudyMode.meaning(word) : '';
+        el.preview.innerHTML = (ko ? `<span class="ok">✓ ${StudyMode.display(word)} = ${ko}</span> · ` : '') + specSummary(s);
       }
     }
     el.btnConfirm.disabled = !!state.pending || !word;
@@ -2912,6 +3114,8 @@ const UI = (() => {
       if (st.splashRadius) parts.push(`폭발 ${st.splashRadius.toFixed(1)}`);
       if (st.income) parts.push(`${st.interval}초당 ${st.income}G`);
       parts.push(`처치 ${t.kills}`);
+      const ko = StudyMode.meaning(t.word);
+      if (ko) parts.unshift(`뜻: ${ko}`);
       el.info.innerHTML =
         `<span class="msg">${specSummary(s)}<br><small>${parts.join(' · ')}</small></span>` +
         `<button class="danger" id="btnSell">판매 +${Math.floor(s.cost * CONFIG.SELL_RATIO)}G</button>`;
@@ -2929,7 +3133,7 @@ const UI = (() => {
     el.enemies.textContent = g.enemies.length + g.spawnQueue.length;
     el.btnWave.disabled = g.waveActive || g.over;
     el.btnWave.textContent = g.waveActive ? `웨이브 ${g.wave} 진행 중` : `웨이브 ${g.wave + 1} 시작`;
-    el.btnReroll.textContent = `새 타일 (${CONFIG.REROLL_COST}G)`;
+    el.btnReroll.textContent = StudyMode.active ? `다른 낱말 (${CONFIG.REROLL_COST}G)` : `새 타일 (${CONFIG.REROLL_COST}G)`;
     el.btnReroll.disabled = g.gold < CONFIG.REROLL_COST;
     el.btnSpeed.textContent = `속도 ${g.speed}x`;
   }
@@ -2972,10 +3176,18 @@ const UI = (() => {
     el.btnWave.onclick = () => state.game.startWave();
     el.btnSpeed.onclick = () => { state.game.speed = state.game.speed === 1 ? 2 : state.game.speed === 2 ? 3 : 1; };
     el.btnRestart.onclick = start;
+    el.btnHint.onclick = revealHint;
+
+    // 단원 선택 목록
+    el.unitSelect.innerHTML = StudyMode.options()
+      .map((o) => `<option value="${o.key}">${o.label}</option>`).join('');
+    el.unitSelect.value = StudyMode.defaultKey();
+    el.unitSelect.onchange = () => { selectUnit(el.unitSelect.value); el.unitSelect.blur(); };
 
     // 키보드: 알파벳 → 해당 글자의 사용 가능한 첫 타일 선택
     window.addEventListener('keydown', (ev) => {
       if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      if (ev.target instanceof HTMLSelectElement) return;
       const k = ev.key;
       if (/^[a-zA-Z]$/.test(k)) {
         const L = k.toUpperCase();
@@ -2998,14 +3210,10 @@ const UI = (() => {
   /* ----- 시작 / 프레임 ----- */
   function start() {
     state.game = new Game();
-    state.rack = Array.from({ length: CONFIG.RACK_SIZE }, () => newTile());
-    state.composition = [];
-    state.pending = null;
     state.selected = null;
     state.message = null;
-    ensureVowels();
     el.overlay.classList.remove('show');
-    renderComposer();
+    selectUnit(el.unitSelect.value || StudyMode.defaultKey());   // 랙/목표 낱말 초기화 + 렌더
   }
 
   let lastGold = -1;
@@ -3018,7 +3226,7 @@ const UI = (() => {
       g.waveClearBonus = 0;
     }
     // 골드가 바뀌면 비용 표시(초록/빨강)를 갱신
-    if (g.gold !== lastGold) { lastGold = g.gold; renderPreview(); }
+    if (g.gold !== lastGold) { lastGold = g.gold; renderPreview(); renderStudy(); }
     if (g.over && !el.overlay.classList.contains('show')) {
       el.overlayText.textContent = `GAME OVER — 웨이브 ${g.wave}`;
       el.overlay.classList.add('show');

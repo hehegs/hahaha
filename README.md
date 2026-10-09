@@ -20,10 +20,15 @@
 
 ## 코드 구조 (`index.html` 내부 모듈)
 
-- `Lexicon` — 단어 사전(Set). `Lexicon.loadFromUrl('words.txt')`로 대용량 단어 목록 연동
+- `Lexicon` — 단어 사전(Set). 기본으로 SCOWL 단어 약 4만 개(3~8글자)가 `index.html`에 내장되어 있고,
+  `Lexicon.loadFromUrl('words.txt')`로 더 큰 단어 목록을 추가할 수 있음
 - `WordValidator` — 규칙 파이프라인. `addRule()`로 금칙어·서버 검증 등 추가
 - `Archetypes` — 타워 행동 구현 (shooter / splash / slow / chain / income)
 - `AbilityRegistry` — 단어 → 능력 해석: 정확 일치 → 의미 태그 → 일반 단어.
   `loadWordTags({ WORD: [tag] })`로 대규모 의미 태그 데이터 연동
 - `Game`, `Enemy`, `Tower`, `Projectile`, `Path` — 디펜스 엔진
 - `Renderer`, `UI` — Canvas 렌더링과 DOM 입력 처리
+
+## 단어 데이터 출처
+
+내장 단어 목록은 [SCOWL](http://wordlist.aspell.net/) (Copyright 2000-2016 Kevin Atkinson)에서 가져왔습니다. 라이선스 전문은 `index.html`의 단어 목록 위 주석에 있습니다.

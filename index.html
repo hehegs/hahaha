@@ -1,31 +1,1419 @@
-
 <!DOCTYPE html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Image Bingo Fun</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;700;900&display=swap" rel="stylesheet">
-    <style>
-      body {
-        font-family: 'Nunito', sans-serif;
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Word Tower Defense</title>
+<style>
+  :root {
+    --bg: #14161f;
+    --panel: #1e2130;
+    --panel-2: #272b3d;
+    --line: #353a52;
+    --text: #e8eaf2;
+    --muted: #8a90a8;
+    --accent: #ffcb47;
+    --good: #4ade80;
+    --bad: #f87171;
+    --tile: #f3e2b3;
+    --tile-edge: #c9a96a;
+    --tile-text: #3b2a12;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); }
+  body {
+    font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans KR", "Apple SD Gothic Neo", sans-serif;
+    display: flex; justify-content: center;
+    -webkit-user-select: none; user-select: none;
+  }
+  #app { width: 100%; max-width: 800px; padding: 12px 16px 28px; }
+
+  /* ---------- 상단 HUD ---------- */
+  .hud {
+    display: flex; flex-wrap: wrap; gap: 8px; align-items: center;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    padding: 8px 10px; margin-bottom: 8px;
+  }
+  .stat { font-weight: 700; font-variant-numeric: tabular-nums; padding: 4px 8px; background: var(--panel-2); border-radius: 6px; }
+  .stat small { color: var(--muted); font-weight: 500; margin-right: 4px; }
+  .hud .spacer { flex: 1; }
+
+  button {
+    font: inherit; font-weight: 700; color: var(--text); cursor: pointer;
+    background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px;
+    padding: 7px 12px;
+  }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button:disabled { opacity: .4; cursor: not-allowed; }
+  button.primary { background: var(--accent); color: #2a1e00; border-color: var(--accent); }
+  button.danger { color: var(--bad); }
+
+  /* ---------- 캔버스 ---------- */
+  .board-wrap { position: relative; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); }
+  canvas { display: block; width: 100%; height: auto; background: #1a2a1f; touch-action: manipulation; }
+  .overlay {
+    position: absolute; inset: 0; display: none; flex-direction: column; gap: 12px;
+    align-items: center; justify-content: center; background: rgba(10, 12, 18, .78);
+    font-size: 28px; font-weight: 800;
+  }
+  .overlay.show { display: flex; }
+
+  /* ---------- 정보/메시지 ---------- */
+  .info {
+    min-height: 44px; margin: 8px 0; padding: 8px 10px; font-size: 14px;
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px;
+    display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  }
+  .info .msg { flex: 1; min-width: 200px; }
+  .badge { font-size: 11px; font-weight: 700; padding: 2px 6px; border-radius: 4px; background: var(--panel-2); color: var(--muted); }
+  .badge.exact { background: #5b3b00; color: var(--accent); }
+  .badge.tag { background: #11385a; color: #7cc4ff; }
+  .err { color: var(--bad); }
+  .ok { color: var(--good); }
+
+  /* ---------- 단어 조합 영역 ---------- */
+  .composer {
+    background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 10px;
+  }
+  .word-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 8px; }
+  .slots {
+    flex: 1; min-width: 200px; min-height: 52px; display: flex; gap: 4px; align-items: center;
+    padding: 4px 6px; border: 2px dashed var(--line); border-radius: 8px;
+  }
+  .slots .hint { color: var(--muted); font-size: 13px; }
+  .preview { font-size: 13px; min-height: 20px; margin-bottom: 10px; }
+
+  .rack { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; margin-bottom: 10px; }
+  .tile {
+    position: relative; width: 44px; height: 44px; border-radius: 6px;
+    background: var(--tile); color: var(--tile-text); border: none;
+    box-shadow: inset 0 -4px 0 var(--tile-edge);
+    font-size: 22px; font-weight: 800; padding: 0;
+    display: inline-flex; align-items: center; justify-content: center;
+  }
+  .tile .pts { position: absolute; right: 4px; bottom: 5px; font-size: 9px; font-weight: 700; }
+  .tile.used { opacity: .25; }
+  .tile.reserved { opacity: .25; outline: 2px solid var(--accent); }
+  .slots .tile { width: 40px; height: 40px; font-size: 20px; }
+  .actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: center; }
+
+  .legend { margin-top: 10px; font-size: 12px; color: var(--muted); line-height: 1.7; }
+  .legend b { color: var(--text); }
+  kbd { background: var(--panel-2); border: 1px solid var(--line); border-radius: 4px; padding: 0 4px; font-size: 11px; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- 상단 HUD -->
+  <div class="hud">
+    <span class="stat"><small>웨이브</small><span id="hudWave">0</span></span>
+    <span class="stat"><small>생명</small><span id="hudLives">20</span></span>
+    <span class="stat"><small>골드</small><span id="hudGold">0</span></span>
+    <span class="stat"><small>적</small><span id="hudEnemies">0</span></span>
+    <span class="spacer"></span>
+    <button id="btnSpeed">속도 1x</button>
+    <button id="btnWave" class="primary">웨이브 시작</button>
+  </div>
+
+  <!-- 게임 맵 -->
+  <div class="board-wrap">
+    <canvas id="board" width="768" height="480"></canvas>
+    <div class="overlay" id="overlay">
+      <div id="overlayText">GAME OVER</div>
+      <button class="primary" id="btnRestart">다시 시작</button>
+    </div>
+  </div>
+
+  <!-- 메시지 / 선택된 타워 정보 -->
+  <div class="info" id="info"><span class="msg">타일로 단어를 만들고 맵에 타워를 배치하세요.</span></div>
+
+  <!-- 단어 조합 UI -->
+  <div class="composer">
+    <div class="word-row">
+      <div class="slots" id="slots"></div>
+      <button id="btnConfirm" class="primary">단어 확정</button>
+    </div>
+    <div class="preview" id="preview"></div>
+    <div class="rack" id="rack"></div>
+    <div class="actions">
+      <button id="btnClear">지우기</button>
+      <button id="btnShuffle">섞기</button>
+      <button id="btnReroll">새 타일</button>
+    </div>
+    <div class="legend">
+      <b>특수 단어</b> GUN 기관총 · ICE 빙결 · MINER 채굴 · FIRE 화염 · BOMB 폭탄 · ZAP 번개 · SNIPER 저격<br>
+      <b>의미 태그</b> SNOW·COLD → 감속 / FLAME·LAVA → 화염 / SWORD·ARROW → 무기 / GOLD·COIN → 수입 / STORM·SPARK → 번개<br>
+      <b>일반 단어</b> 길이가 길수록 데미지가 커집니다.
+      키보드: 알파벳 입력 · <kbd>Backspace</kbd> 지우기 · <kbd>Enter</kbd> 확정 · <kbd>Esc</kbd> 배치 취소 · 우클릭 배치 취소
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+
+/* =====================================================================
+ *  WORD TOWER DEFENSE — 프로토타입
+ * ---------------------------------------------------------------------
+ *  구조 (단일 파일이지만 모듈 경계를 명확히 나눠 두었음)
+ *
+ *   1. CONFIG            : 밸런스/맵 상수
+ *   2. Lexicon           : 단어 사전 저장소 (20만+ 단어 연동 지점)
+ *   3. WordValidator     : 규칙 파이프라인 기반 단어 검증
+ *   4. Archetypes        : 타워 "행동" 구현 (공격 방식)
+ *   5. AbilityRegistry   : 단어 → 능력(TowerSpec) 매핑
+ *                          (정확 일치 → 의미 태그 → 일반 단어 순으로 해석)
+ *   6. LetterBag / Rack  : 알파벳 타일 생성/관리
+ *   7. 엔진              : Path, Enemy, Tower, Projectile, Game
+ *   8. Renderer          : Canvas 그리기
+ *   9. UI                : DOM 바인딩, 입력 처리
+ *  10. Main loop
+ *
+ *  나중에 파일을 분리할 때는 2~5번을 그대로 별도 ES 모듈로 옮기면 된다.
+ *  (각 모듈은 전역 상태에 의존하지 않고 public API만 노출하도록 작성)
+ * ===================================================================== */
+
+
+/* =====================================================================
+ * 1. CONFIG
+ * ===================================================================== */
+const CONFIG = {
+  COLS: 16,
+  ROWS: 10,
+  CELL: 48,                 // 1칸 = 48px. 사거리/속도는 모두 "칸" 단위로 정의하고 여기서 px로 환산
+
+  START_GOLD: 120,
+  START_LIVES: 20,
+
+  RACK_SIZE: 8,             // 하단 타일 개수
+  MIN_WORD_LEN: 3,
+  MAX_WORD_LEN: 8,
+  MIN_VOWELS: 2,            // 타일 보충 시 보장할 최소 모음 수
+  REROLL_COST: 15,
+  SELL_RATIO: 0.5,
+
+  // 적 경로: 그리드 좌표 웨이포인트. 맵 밖(-1, 16)에서 시작/종료
+  PATH: [[-1, 1], [3, 1], [3, 7], [7, 7], [7, 2], [11, 2], [11, 8], [16, 8]],
+};
+
+
+/* =====================================================================
+ * 2. Lexicon — 단어 사전 저장소
+ * ---------------------------------------------------------------------
+ *  - 내부는 Set<string>(대문자 정규화)로 O(1) 조회.
+ *    20만 단어 기준 메모리 수 MB 수준이라 브라우저에서 충분히 감당 가능.
+ *  - 대용량 연동 방법:
+ *      await Lexicon.loadFromUrl('words.txt');           // 줄 단위 텍스트
+ *      await Lexicon.loadFromUrl('words.json', 'json');  // ["apple", ...]
+ *  - 더 줄이고 싶다면 이 모듈 내부만 Trie/DAWG/Bloom filter로 바꾸면 되고,
+ *    외부에서는 has()/addWords()만 쓰므로 나머지 코드는 수정할 필요가 없다.
+ *  - 메인 스레드 블로킹이 문제라면 loadFromUrl 파싱 부분을 Web Worker로 옮길 것.
+ * ===================================================================== */
+const Lexicon = (() => {
+  const words = new Set();
+
+  /** 입력을 사전 키 형태(A-Z 대문자)로 정규화. 유효하지 않으면 null */
+  function normalize(raw) {
+    const w = String(raw).trim().toUpperCase();
+    return /^[A-Z]+$/.test(w) ? w : null;
+  }
+
+  /** 문자열 배열/이터러블을 사전에 추가 */
+  function addWords(iterable) {
+    for (const raw of iterable) {
+      const w = normalize(raw);
+      if (w) words.add(w);
+    }
+    return words.size;
+  }
+
+  /** 외부 단어 파일 로드 (text: 줄 단위, json: 문자열 배열) */
+  async function loadFromUrl(url, format = 'text') {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`사전 로드 실패: ${res.status}`);
+    const list = format === 'json' ? await res.json() : (await res.text()).split(/\r?\n/);
+    return addWords(list);
+  }
+
+  return {
+    normalize,
+    addWords,
+    loadFromUrl,
+    has: (word) => words.has(word),
+    get size() { return words.size; },
+  };
+})();
+
+// 프로토타입용 내장 단어 목록 (실서비스에서는 loadFromUrl로 교체/추가)
+Lexicon.addWords(`
+ACE ACT ADD AGE AGO AID AIM AIR ALE ALL AND ANT ANY APE ARC ARE ARK ARM ART ASH ASK ATE AXE
+BAD BAG BAN BAR BAT BED BEE BEG BET BIG BIN BIT BOW BOX BOY BUD BUG BUS BUT BUY CAB CAN CAP
+CAR CAT COP COW CRY CUB CUP CUT DAD DAM DAY DEN DEW DIG DIM DIP DOG DOT DRY DUE DUG EAR EAT
+EGG ELF ELM END ERA EVE EYE FAN FAR FAT FED FEW FIG FIN FIR FIT FIX FLY FOE FOG FOR FOX FRY
+FUN FUR GAP GAS GEL GEM GET GOD GOT GUM GUN GUT GUY HAM HAT HEN HER HIM HIP HIS HIT HOG HOP
+HOT HOW HUB HUE HUG HUT ICE ICY ILL INK INN ION IVY JAM JAR JAW JET JOB JOG JOY KEG KEY KID
+KIN KIT LAB LAD LAP LAW LAY LED LEG LET LID LIE LIP LIT LOG LOT LOW MAD MAN MAP MAT MAY MEN
+MET MIX MOB MOP MUD MUG NAP NET NEW NOD NOR NOT NOW NUT OAK OAR OAT ODD OFF OIL OLD ONE ORB
+ORE OUR OUT OWL OWN PAD PAN PAT PAW PAY PEA PEN PET PIE PIG PIN PIT POD POT PUN PUP PUT RAG
+RAM RAN RAT RAW RAY RED RIB RID RIM RIP ROD ROT ROW RUB RUG RUN SAD SAP SAT SAW SAY SEA SEE
+SET SEW SHE SHY SIN SIP SIR SIT SIX SKI SKY SLY SOB SOD SON SOW SOY SPA SPY SUM SUN TAB TAG
+TAN TAP TAR TEA TEN THE TIE TIN TIP TOE TON TOO TOP TOW TOY TUB TUG TWO URN USE VAN VAT VET
+VOW WAR WAS WAX WAY WEB WET WHO WHY WIG WIN WIT WOE WON YAK YAM YES YET YEW YOU ZAP ZIP ZOO
+
+ABLE ACID AREA ARMY ARCH AUNT BABY BACK BAKE BALL BAND BANK BARN BASE BATH BEAM BEAN BEAR
+BEAT BELL BELT BEND BIKE BIRD BITE BLUE BOAT BODY BOIL BOLT BOMB BONE BOOK BOOM BOOT BORN
+BOSS BOWL BURN BUSH BUSY CAGE CAKE CALM CAMP CARD CARE CART CASE CASH CAST CAVE CELL CHIP
+CITY CLAP CLAW CLAY CLUB COAL COAT CODE COIN COLD COOK COOL COPY CORE CORN COST CRAB CROW
+CURE DARK DART DASH DATA DATE DAWN DEAL DEAR DEEP DEER DESK DICE DIRT DISH DIVE DOOR DOVE
+DOWN DRAW DROP DRUM DUCK DUST DUTY EARN EASY EDGE EPIC EVIL FACE FACT FAIR FALL FARM FAST
+FATE FEAR FEED FEEL FIRE FISH FIST FLAG FLAT FLEA FLOW FOAM FOOD FOOT FORM FORT FREE FROG
+FUEL GAIN GAME GATE GEAR GIFT GIRL GLOW GOAL GOAT GOLD GOLF GOOD GRIP GROW GULF HAIL HAIR
+HALF HALL HAND HARD HARM HATE HAWK HEAD HEAL HEAP HEAT HELP HERO HIDE HIGH HILL HINT HOLD
+HOLE HOME HOOK HOPE HORN HOSE HOUR HUNT HURT IDEA IRON ITEM JAIL JUMP KICK KILL KIND KING
+KITE KNEE KNIT KNOT LACE LAKE LAMP LAND LANE LAVA LEAD LEAF LEFT LENS LIFE LIFT LIME LINE
+LION LIST LOAD LOAN LOCK LONG LOOP LORD LOSE LOUD LOVE LUCK MAIL MAIN MALE MASK MEAL MEAT
+MILD MILK MILL MINE MINT MIST MOAT MOLE MOON MORE MOSS MOTH MOVE NAIL NAME NEAR NECK NEST
+NEWS NICE NINE NOSE NOTE OPEN OVEN PACE PACK PAGE PAIN PAIR PALM PARK PART PASS PAST PATH
+PEAK PEAR PINE PINK PIPE PLAN PLAY PLOT PLUM POEM POET POLE POND POOL PORT POUR PULL PUMP
+PURE PUSH RACE RAFT RAGE RAIN RANK RARE READ REAL REST RICE RICH RIDE RING RISE RISK ROAD
+ROAR ROBE ROCK ROLE ROLL ROOF ROOM ROOT ROPE ROSE RUBY RULE RUSH RUST SAFE SAIL SALT SAND
+SAVE SEAL SEAT SEED SHIP SHOE SHOP SHOT SICK SIDE SIGN SILK SING SINK SIZE SKIN SLOW SNOW
+SOAP SOCK SOFT SOIL SONG SOUL SOUP SPIN STAR STAY STEP STEM STIR SUIT SWAN TAIL TALE TALK
+TALL TANK TAPE TEAM TEAR TENT TIDE TILE TIME TINY TOAD TOLD TONE TOOL TOUR TOWN TRAP TREE
+TRIP TRUE TUNE TURN TWIN UNIT VASE VAST VEST VIEW VINE VOTE WAGE WAIT WAKE WALK WALL WAND
+WANT WARM WARN WASH WAVE WEAK WEAR WEED WELL WEST WHIP WIDE WIFE WILD WIND WING WINE WIRE
+WISE WISH WOLF WOOD WOOL WORD WORK WORM YARD YARN YEAR ZERO ZONE
+
+ALARM ANGEL ANGER APPLE ARMOR ARROW BEACH BEAST BLADE BLAST BLAZE BLOOD BOARD BRAIN BREAD
+BRICK BRUSH CANDY CHAIN CHAIR CHARM CHEST CLOUD COAST CRANE CROWN DANCE DREAM DRINK EAGLE
+EARTH FEAST FIELD FLAME FLASH FLOOD FLOOR FROST FRUIT GHOST GIANT GLASS GRAPE GRASS GUARD
+HEART HONEY HORSE HOUSE KNIFE LASER LEMON LIGHT MAGIC MATCH METAL MINER MONEY MOUSE MUSIC
+NIGHT NOISE OCEAN ONION PAINT PEARL PIANO PLANE PLANT POWER QUEEN QUEST RADAR RIVER ROBOT
+SALAD SHARK SHEEP SHELL SHORE SLEEP SMILE SNAKE SPARK SPEAR SPICE STAIR STEAM STEEL STONE
+STORM SUGAR SWORD TABLE TIGER TOAST TORCH TOWER TRAIN TRUCK WATER WHALE WHEEL WITCH WORLD
+
+ANCHOR ARCHER BANANA BASKET BATTLE BRIDGE CANDLE CANNON CASTLE CHEESE DRAGON FLOWER FOREST
+FREEZE GARDEN GOLDEN HAMMER HUNTER ISLAND JUNGLE KNIGHT LETTER MARKET MIRROR MONKEY ORANGE
+PENCIL PLANET POCKET RABBIT ROCKET SHIELD SILVER SNIPER SPIDER STREAM SUMMER THREAD TURTLE
+WINTER WIZARD CRYSTAL DIAMOND EXPLODE GLACIER MONSTER RAINBOW THUNDER TORNADO VOLCANO
+BLIZZARD TREASURE
+`.split(/\s+/));
+
+
+/* =====================================================================
+ * 3. WordValidator — 규칙 파이프라인
+ * ---------------------------------------------------------------------
+ *  규칙은 { id, check(word, ctx) => 에러메시지 | null } 형태.
+ *  순서대로 실행하고 첫 실패에서 멈춘다.
+ *  추가 규칙(금칙어, 이미 사용한 단어 금지, 서버 검증 등)은 addRule로 끼워 넣는다.
+ *    WordValidator.addRule({ id: 'banned', check: w => BANNED.has(w) ? '금지어' : null });
+ *  비동기 서버 검증이 필요해지면 validate를 async로 바꾸고 check가 Promise를
+ *  반환하도록 확장하면 된다(호출부는 UI.confirmWord 한 곳뿐).
+ * ===================================================================== */
+const WordValidator = (() => {
+  const rules = [
+    {
+      id: 'length',
+      check: (w) =>
+        w.length < CONFIG.MIN_WORD_LEN ? `${CONFIG.MIN_WORD_LEN}글자 이상이어야 합니다` :
+        w.length > CONFIG.MAX_WORD_LEN ? `${CONFIG.MAX_WORD_LEN}글자 이하여야 합니다` : null,
+    },
+    { id: 'charset',    check: (w) => /^[A-Z]+$/.test(w) ? null : '알파벳만 사용할 수 있습니다' },
+    { id: 'dictionary', check: (w) => Lexicon.has(w) ? null : '사전에 없는 단어입니다' },
+  ];
+
+  return {
+    /** @returns {{ok: true} | {ok: false, rule: string, reason: string}} */
+    validate(word, ctx = {}) {
+      for (const rule of rules) {
+        const reason = rule.check(word, ctx);
+        if (reason) return { ok: false, rule: rule.id, reason };
       }
-    </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react/": "https://esm.sh/react@^19.1.1/",
-    "react": "https://esm.sh/react@^19.1.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.1.1/"
+      return { ok: true };
+    },
+    addRule(rule, index = rules.length) { rules.splice(index, 0, rule); },
+    removeRule(id) {
+      const i = rules.findIndex((r) => r.id === id);
+      if (i >= 0) rules.splice(i, 1);
+    },
+  };
+})();
+
+
+/* =====================================================================
+ * 4. Archetypes — 타워 행동(공격 방식) 구현
+ * ---------------------------------------------------------------------
+ *  "단어"와 "행동"을 분리하는 것이 확장성의 핵심.
+ *  - 행동(Archetype)은 코드로 소수만 구현한다: shooter, splash, slow, chain, income
+ *  - 단어는 데이터(AbilityRegistry)로 수십만 개를 행동 + 수치에 매핑한다.
+ *  새 행동을 추가하려면 여기에 update(tower, game, dt)를 가진 항목을 하나 추가.
+ *  tower.stats 는 TowerSpec.stats 가 그대로 복사된 값이다.
+ * ===================================================================== */
+const Archetypes = {
+  /** 단일 대상 투사체 */
+  shooter: {
+    label: '단일 공격',
+    update(t, game, dt) {
+      t.cooldown -= dt;
+      if (t.cooldown > 0) return;
+      const target = game.findTarget(t.x, t.y, t.stats.range * CONFIG.CELL);
+      if (!target) return;
+      t.cooldown = 1 / t.stats.fireRate;
+      t.aim = Math.atan2(target.y - t.y, target.x - t.x);
+      game.spawnProjectile(t, target, {
+        speed: t.stats.projectileSpeed ?? 9,
+        radius: 3,
+        onHit: (g, enemy) => { if (enemy && !enemy.dead) g.damageEnemy(enemy, t.stats.damage, t); },
+      });
+    },
+  },
+
+  /** 범위 폭발 투사체 */
+  splash: {
+    label: '범위 공격',
+    update(t, game, dt) {
+      t.cooldown -= dt;
+      if (t.cooldown > 0) return;
+      const target = game.findTarget(t.x, t.y, t.stats.range * CONFIG.CELL);
+      if (!target) return;
+      t.cooldown = 1 / t.stats.fireRate;
+      t.aim = Math.atan2(target.y - t.y, target.x - t.x);
+      game.spawnProjectile(t, target, {
+        speed: t.stats.projectileSpeed ?? 6,
+        radius: 5,
+        onHit: (g, _enemy, x, y) => {
+          const r = t.stats.splashRadius * CONFIG.CELL;
+          g.damageArea(x, y, r, t.stats.damage, t);
+          g.addEffect({ kind: 'ring', x, y, r, color: t.color, ttl: 0.3 });
+        },
+      });
+    },
+  },
+
+  /** 주기적 파동: 사거리 내 모든 적 감속 + 약한 데미지 */
+  slow: {
+    label: '감속 파동',
+    update(t, game, dt) {
+      t.cooldown -= dt;
+      if (t.cooldown > 0) return;
+      const range = t.stats.range * CONFIG.CELL;
+      const targets = game.enemiesInRange(t.x, t.y, range);
+      if (!targets.length) return;
+      t.cooldown = 1 / t.stats.fireRate;
+      for (const e of targets) {
+        e.applySlow(t.stats.slow, t.stats.slowDuration);
+        if (t.stats.damage) game.damageEnemy(e, t.stats.damage, t);
+      }
+      game.addEffect({ kind: 'ring', x: t.x, y: t.y, r: range, color: t.color, ttl: 0.4 });
+    },
+  },
+
+  /** 연쇄 번개: 즉발, 가까운 적으로 튀며 데미지 감소 */
+  chain: {
+    label: '연쇄 번개',
+    update(t, game, dt) {
+      t.cooldown -= dt;
+      if (t.cooldown > 0) return;
+      const first = game.findTarget(t.x, t.y, t.stats.range * CONFIG.CELL);
+      if (!first) return;
+      t.cooldown = 1 / t.stats.fireRate;
+
+      const hit = new Set();
+      const points = [[t.x, t.y]];
+      let cur = first;
+      let dmg = t.stats.damage;
+      for (let i = 0; i < t.stats.chains && cur; i++) {
+        hit.add(cur);
+        points.push([cur.x, cur.y]);
+        game.damageEnemy(cur, dmg, t);
+        dmg *= 0.8;
+        cur = game.nearestEnemy(cur.x, cur.y, 1.8 * CONFIG.CELL, hit);
+      }
+      game.addEffect({ kind: 'bolt', points, color: t.color, ttl: 0.15 });
+    },
+  },
+
+  /** 공격 없음. 웨이브 진행 중 주기적으로 골드 생산 */
+  income: {
+    label: '자원 생산',
+    update(t, game, dt) {
+      if (!game.waveActive) return;
+      t.cooldown -= dt;
+      if (t.cooldown > 0) return;
+      t.cooldown = t.stats.interval;
+      game.gold += t.stats.income;
+      game.addFloater(`+${t.stats.income}G`, t.x, t.y - 18, '#ffcb47');
+    },
+  },
+};
+
+
+/* =====================================================================
+ * 5. AbilityRegistry — 단어 → 능력 매핑
+ * ---------------------------------------------------------------------
+ *  해석 우선순위
+ *   (1) 정확 일치  : WORD 자체에 고유 능력 (GUN, ICE, MINER ...)
+ *   (2) 의미 태그  : WORD → [tag...] → 태그별 능력 (SNOW → cold → 감속)
+ *   (3) 일반 단어  : 길이에 비례한 기본 데미지 타워
+ *
+ *  20만 단어 연동 전략
+ *   - 20만 개에 모두 고유 능력을 손으로 붙이는 건 불가능하므로 (2) 태그 계층이 핵심.
+ *   - 외부 데이터(WordNet 상위어, 임베딩 클러스터링, LLM 분류 등)로
+ *     "단어 → 의미 태그" JSON만 생성하면 된다:
+ *        { "SNOW": ["cold"], "BLIZZARD": ["cold","wind"], ... }
+ *     → AbilityRegistry.loadWordTags(json)
+ *   - 능력 정의(TowerSpec 템플릿)는 소수(수십 개)로 유지 → 밸런스 관리가 쉬움.
+ *
+ *  TowerSpec 형식 (resolve의 반환값, 타워 생성에 그대로 사용)
+ *   { word, archetype, name, icon, color, desc, cost, stats: {...}, source }
+ *  능력 정의의 stats/cost 는 고정 값 또는 (word) => 값 함수 둘 다 허용.
+ * ===================================================================== */
+const AbilityRegistry = (() => {
+  const exact = new Map();     // WORD -> AbilityDef
+  const tagDefs = new Map();   // tag  -> AbilityDef
+  const wordTags = new Map();  // WORD -> string[] (앞쪽 태그가 우선)
+
+  const evalField = (v, word) => (typeof v === 'function' ? v(word) : v);
+
+  /** 정의 + 단어 → 최종 TowerSpec */
+  function build(def, word, source, tag) {
+    if (!Archetypes[def.archetype]) throw new Error(`알 수 없는 archetype: ${def.archetype}`);
+    return {
+      word,
+      archetype: def.archetype,
+      name: def.name,
+      icon: def.icon ?? '',
+      color: def.color,
+      desc: evalField(def.desc, word),
+      cost: Math.round(evalField(def.cost, word)),
+      stats: { ...evalField(def.stats, word) },
+      source,   // 'exact' | 'tag' | 'generic'
+      tag,
+    };
+  }
+
+  /** (3) 매핑되지 않은 일반 단어: 길이가 길수록 데미지가 강해진다 */
+  const GENERIC = {
+    archetype: 'shooter',
+    name: '단어 타워',
+    icon: '✦',
+    color: '#c4b5fd',
+    cost: (w) => w.length * 10,
+    stats: (w) => ({
+      damage: Math.round(w.length * w.length * 1.2), // 3→11, 4→19, 5→30, 6→43, 7→59, 8→77
+      fireRate: 1.2,
+      range: 2.3 + w.length * 0.15,
+    }),
+    desc: (w) => `길이 ${w.length} → 데미지 ${Math.round(w.length * w.length * 1.2)}`,
+  };
+
+  return {
+    registerWord(word, def) { exact.set(word.toUpperCase(), def); },
+    registerTag(tag, def) { tagDefs.set(tag, def); },
+    /** 여러 단어에 같은 태그 부여 */
+    tagWords(tag, words) {
+      for (const raw of words) {
+        const w = raw.toUpperCase();
+        const list = wordTags.get(w) ?? [];
+        if (!list.includes(tag)) list.push(tag);
+        wordTags.set(w, list);
+      }
+    },
+    /** 대용량 태그 데이터 로드: { WORD: [tag, ...] } */
+    loadWordTags(obj) {
+      for (const [w, tags] of Object.entries(obj)) wordTags.set(w.toUpperCase(), [...tags]);
+    },
+
+    /** 단어 → TowerSpec (검증은 WordValidator에서 미리 끝났다고 가정) */
+    resolve(word) {
+      if (exact.has(word)) return build(exact.get(word), word, 'exact');
+      for (const tag of wordTags.get(word) ?? []) {
+        if (tagDefs.has(tag)) return build(tagDefs.get(tag), word, 'tag', tag);
+      }
+      return build(GENERIC, word, 'generic');
+    },
+  };
+})();
+
+/* ---------- (1) 정확 일치 능력 ---------- */
+AbilityRegistry.registerWord('GUN', {
+  archetype: 'shooter', name: '기관총 타워', icon: '🔫', color: '#fbbf24', cost: 40,
+  stats: { damage: 4, fireRate: 6, range: 2.6, projectileSpeed: 14 },
+  desc: '공격 속도가 매우 빠른 단일 타겟 공격',
+});
+AbilityRegistry.registerWord('ICE', {
+  archetype: 'slow', name: '빙결 타워', icon: '❄', color: '#7dd3fc', cost: 40,
+  stats: { damage: 2, fireRate: 1, range: 2.2, slow: 0.5, slowDuration: 1.5 },
+  desc: '주변 적의 이동 속도를 50% 감소',
+});
+AbilityRegistry.registerWord('MINER', {
+  archetype: 'income', name: '채굴 타워', icon: '⛏', color: '#facc15', cost: 50,
+  stats: { income: 12, interval: 5, range: 0 },
+  desc: '공격하지 않음. 웨이브 중 5초마다 12골드 생산',
+});
+AbilityRegistry.registerWord('FIRE', {
+  archetype: 'splash', name: '화염 타워', icon: '🔥', color: '#fb923c', cost: 50,
+  stats: { damage: 12, fireRate: 1, range: 2.4, splashRadius: 0.9 },
+  desc: '착탄 지점 주변에 범위 데미지',
+});
+AbilityRegistry.registerWord('BOMB', {
+  archetype: 'splash', name: '폭탄 타워', icon: '💣', color: '#ef4444', cost: 60,
+  stats: { damage: 32, fireRate: 0.5, range: 3, splashRadius: 1.3, projectileSpeed: 5 },
+  desc: '느리지만 넓은 범위 폭발',
+});
+AbilityRegistry.registerWord('ZAP', {
+  archetype: 'chain', name: '번개 타워', icon: '⚡', color: '#a78bfa', cost: 45,
+  stats: { damage: 12, fireRate: 1, range: 2.6, chains: 4 },
+  desc: '최대 4명에게 튀는 연쇄 번개',
+});
+AbilityRegistry.registerWord('SNIPER', {
+  archetype: 'shooter', name: '저격 타워', icon: '🎯', color: '#f472b6', cost: 70,
+  stats: { damage: 90, fireRate: 0.4, range: 6, projectileSpeed: 22 },
+  desc: '매우 긴 사거리, 강력한 한 방',
+});
+
+/* ---------- (2) 의미 태그 능력 (단어 길이로 수치 보정) ---------- */
+AbilityRegistry.registerTag('cold', {
+  archetype: 'slow', name: '냉기 타워', icon: '❄', color: '#93c5fd',
+  cost: (w) => 20 + w.length * 6,
+  stats: (w) => ({
+    damage: w.length, fireRate: 0.9, range: 1.8 + w.length * 0.12,
+    slow: Math.min(0.7, 0.3 + w.length * 0.05), slowDuration: 1.5,
+  }),
+  desc: (w) => `차가운 의미 → 감속 ${Math.round(Math.min(0.7, 0.3 + w.length * 0.05) * 100)}%`,
+});
+AbilityRegistry.registerTag('fire', {
+  archetype: 'splash', name: '열기 타워', icon: '🔥', color: '#fdba74',
+  cost: (w) => 20 + w.length * 8,
+  stats: (w) => ({ damage: 4 + w.length * 3, fireRate: 1, range: 2.3, splashRadius: 0.8 + w.length * 0.05 }),
+  desc: '뜨거운 의미 → 범위 화염',
+});
+AbilityRegistry.registerTag('explosive', {
+  archetype: 'splash', name: '폭발 타워', icon: '💥', color: '#f87171',
+  cost: (w) => 30 + w.length * 8,
+  stats: (w) => ({ damage: 10 + w.length * 5, fireRate: 0.5, range: 2.8, splashRadius: 1.2, projectileSpeed: 5 }),
+  desc: '폭발 의미 → 강한 범위 공격',
+});
+AbilityRegistry.registerTag('electric', {
+  archetype: 'chain', name: '전기 타워', icon: '⚡', color: '#c4b5fd',
+  cost: (w) => 20 + w.length * 7,
+  stats: (w) => ({ damage: 5 + w.length * 2, fireRate: 1, range: 2.5, chains: Math.min(6, 1 + Math.floor(w.length / 2)) }),
+  desc: '전기 의미 → 연쇄 번개',
+});
+AbilityRegistry.registerTag('weapon', {
+  archetype: 'shooter', name: '무기 타워', icon: '⚔', color: '#e5e7eb',
+  cost: (w) => w.length * 10,
+  stats: (w) => ({ damage: Math.round(w.length * w.length * 1.5), fireRate: 1.5, range: 2.6 }),
+  desc: '무기 의미 → 일반 단어보다 강한 단일 공격',
+});
+AbilityRegistry.registerTag('wealth', {
+  archetype: 'income', name: '보물 타워', icon: '💰', color: '#fde047',
+  cost: (w) => 30 + w.length * 5,
+  stats: (w) => ({ income: 4 + w.length * 2, interval: 6, range: 0 }),
+  desc: (w) => `재물 의미 → 6초마다 ${4 + w.length * 2}골드`,
+});
+
+AbilityRegistry.tagWords('cold', ['ICY', 'COLD', 'SNOW', 'HAIL', 'FROST', 'FREEZE', 'WINTER', 'GLACIER', 'BLIZZARD']);
+AbilityRegistry.tagWords('fire', ['HOT', 'HEAT', 'BURN', 'LAVA', 'FLAME', 'BLAZE', 'TORCH', 'CANDLE', 'DRAGON', 'VOLCANO']);
+AbilityRegistry.tagWords('explosive', ['BOOM', 'BLAST', 'CANNON', 'ROCKET', 'EXPLODE']);
+AbilityRegistry.tagWords('electric', ['BOLT', 'SPARK', 'FLASH', 'STORM', 'LASER', 'THUNDER', 'WIRE']);
+AbilityRegistry.tagWords('weapon', ['AXE', 'BOW', 'ARMY', 'DART', 'SPEAR', 'SWORD', 'ARROW', 'KNIFE', 'BLADE', 'ARCHER', 'HUNTER', 'KNIGHT', 'HAMMER']);
+AbilityRegistry.tagWords('wealth', ['GEM', 'GOLD', 'COIN', 'CASH', 'BANK', 'MINE', 'RUBY', 'PEARL', 'MONEY', 'SILVER', 'GOLDEN', 'DIAMOND', 'CRYSTAL', 'TREASURE']);
+
+
+/* =====================================================================
+ * 6. LetterBag / Rack — 알파벳 타일
+ * ---------------------------------------------------------------------
+ *  스크래블 분포 가중치로 무작위 추출(무한 주머니).
+ *  랙은 고정 슬롯 배열이며, 각 타일은 고유 id를 가진다.
+ * ===================================================================== */
+const LetterBag = (() => {
+  // 스크래블 개수 분포 / 점수 (점수는 표시용)
+  const DIST = {
+    A: [9, 1], B: [2, 3], C: [2, 3], D: [4, 2], E: [12, 1], F: [2, 4], G: [3, 2], H: [2, 4], I: [9, 1],
+    J: [1, 8], K: [1, 5], L: [4, 1], M: [2, 3], N: [6, 1], O: [8, 1], P: [2, 3], Q: [1, 10], R: [6, 1],
+    S: [4, 1], T: [6, 1], U: [4, 1], V: [2, 4], W: [2, 4], X: [1, 8], Y: [2, 4], Z: [1, 10],
+  };
+  const pool = Object.entries(DIST).flatMap(([l, [n]]) => Array(n).fill(l));
+  const VOWELS = 'AEIOU';
+
+  return {
+    VOWELS,
+    draw: () => pool[(Math.random() * pool.length) | 0],
+    drawVowel: () => VOWELS[(Math.random() * VOWELS.length) | 0],
+    points: (l) => DIST[l][1],
+  };
+})();
+
+let tileSeq = 0;
+const newTile = (letter = LetterBag.draw()) => ({ id: ++tileSeq, letter });
+
+
+/* =====================================================================
+ * 7. 엔진
+ * ===================================================================== */
+
+/** 웨이포인트 경로. 누적 거리(px)로 위치를 구한다. */
+class Path {
+  constructor(gridPoints) {
+    const C = CONFIG.CELL;
+    this.points = gridPoints.map(([c, r]) => ({ x: c * C + C / 2, y: r * C + C / 2 }));
+    this.segLens = [];
+    this.length = 0;
+    for (let i = 0; i < this.points.length - 1; i++) {
+      const a = this.points[i], b = this.points[i + 1];
+      const len = Math.hypot(b.x - a.x, b.y - a.y);
+      this.segLens.push(len);
+      this.length += len;
+    }
+    // 경로가 지나는 그리드 칸 (건설 불가)
+    this.cells = new Set();
+    for (let i = 0; i < gridPoints.length - 1; i++) {
+      let [c, r] = gridPoints[i];
+      const [c2, r2] = gridPoints[i + 1];
+      const dc = Math.sign(c2 - c), dr = Math.sign(r2 - r);
+      while (true) {
+        if (c >= 0 && c < CONFIG.COLS && r >= 0 && r < CONFIG.ROWS) this.cells.add(`${c},${r}`);
+        if (c === c2 && r === r2) break;
+        c += dc; r += dr;
+      }
+    }
+  }
+
+  pointAt(dist) {
+    let d = Math.max(0, dist);
+    for (let i = 0; i < this.segLens.length; i++) {
+      if (d <= this.segLens[i]) {
+        const a = this.points[i], b = this.points[i + 1], t = d / this.segLens[i];
+        return { x: a.x + (b.x - a.x) * t, y: a.y + (b.y - a.y) * t };
+      }
+      d -= this.segLens[i];
+    }
+    return { ...this.points[this.points.length - 1] };
   }
 }
+
+/** 적 타입 정의 (speed: 칸/초) */
+const ENEMY_TYPES = {
+  normal: { hp: 22,  speed: 1.6, reward: 3,  radius: 10, color: '#86efac', leak: 1 },
+  fast:   { hp: 14,  speed: 2.8, reward: 3,  radius: 8,  color: '#fde68a', leak: 1 },
+  tank:   { hp: 80,  speed: 1.0, reward: 8,  radius: 14, color: '#fca5a5', leak: 2 },
+  boss:   { hp: 450, speed: 0.8, reward: 60, radius: 18, color: '#f0abfc', leak: 5 },
+};
+
+class Enemy {
+  constructor(type, hpMul, path) {
+    const def = ENEMY_TYPES[type];
+    this.type = type;
+    this.maxHp = Math.round(def.hp * hpMul);
+    this.hp = this.maxHp;
+    this.speed = def.speed;
+    this.reward = def.reward;
+    this.radius = def.radius;
+    this.color = def.color;
+    this.leak = def.leak;
+    this.path = path;
+    this.dist = 0;          // 경로상 이동 거리 → 타겟팅 우선순위("가장 앞선 적")에 사용
+    this.slowFactor = 0;    // 0~1, 감소 비율
+    this.slowTimer = 0;
+    this.dead = false;
+    this.reached = false;
+    Object.assign(this, path.pointAt(0));
+  }
+
+  /** 더 강한 감속이 우선, 지속시간은 갱신 */
+  applySlow(factor, duration) {
+    if (factor >= this.slowFactor || this.slowTimer <= 0) this.slowFactor = factor;
+    this.slowTimer = Math.max(this.slowTimer, duration);
+  }
+
+  update(dt) {
+    if (this.slowTimer > 0) {
+      this.slowTimer -= dt;
+      if (this.slowTimer <= 0) this.slowFactor = 0;
+    }
+    this.dist += this.speed * (1 - this.slowFactor) * CONFIG.CELL * dt;
+    if (this.dist >= this.path.length) { this.reached = true; return; }
+    Object.assign(this, this.path.pointAt(this.dist));
+  }
+}
+
+class Tower {
+  constructor(spec, col, row) {
+    this.spec = spec;
+    this.word = spec.word;
+    this.archetype = Archetypes[spec.archetype];
+    this.stats = { ...spec.stats };
+    this.color = spec.color;
+    this.col = col;
+    this.row = row;
+    this.x = col * CONFIG.CELL + CONFIG.CELL / 2;
+    this.y = row * CONFIG.CELL + CONFIG.CELL / 2;
+    this.cooldown = 0;
+    this.aim = -Math.PI / 2;
+    this.kills = 0;
+    if (spec.archetype === 'income') this.cooldown = this.stats.interval;
+  }
+  update(game, dt) { this.archetype.update(this, game, dt); }
+}
+
+class Projectile {
+  constructor(tower, target, opts) {
+    this.x = tower.x; this.y = tower.y;
+    this.target = target;
+    this.tx = target.x; this.ty = target.y;
+    this.speed = opts.speed * CONFIG.CELL;
+    this.radius = opts.radius;
+    this.color = tower.color;
+    this.onHit = opts.onHit;
+    this.done = false;
+  }
+  update(game, dt) {
+    // 대상이 살아 있으면 유도, 죽었으면 마지막 위치로 비행
+    if (!this.target.dead && !this.target.reached) { this.tx = this.target.x; this.ty = this.target.y; }
+    const dx = this.tx - this.x, dy = this.ty - this.y;
+    const d = Math.hypot(dx, dy), step = this.speed * dt;
+    if (d <= step) {
+      this.x = this.tx; this.y = this.ty;
+      this.done = true;
+      this.onHit(game, this.target.dead ? null : this.target, this.x, this.y);
+    } else {
+      this.x += (dx / d) * step;
+      this.y += (dy / d) * step;
+    }
+  }
+}
+
+/** 게임 상태 + 시뮬레이션 루프 */
+class Game {
+  constructor() {
+    this.path = new Path(CONFIG.PATH);
+    this.gold = CONFIG.START_GOLD;
+    this.lives = CONFIG.START_LIVES;
+    this.wave = 0;
+    this.waveActive = false;
+    this.spawnQueue = [];   // [{type, delay}]
+    this.spawnTimer = 0;
+    this.enemies = [];
+    this.towers = new Map(); // "c,r" -> Tower
+    this.projectiles = [];
+    this.effects = [];
+    this.floaters = [];
+    this.speed = 1;
+    this.over = false;
+  }
+
+  /* ----- 그리드 ----- */
+  isBuildable(c, r) {
+    return c >= 0 && c < CONFIG.COLS && r >= 0 && r < CONFIG.ROWS &&
+      !this.path.cells.has(`${c},${r}`) && !this.towers.has(`${c},${r}`);
+  }
+  placeTower(spec, c, r) {
+    const t = new Tower(spec, c, r);
+    this.towers.set(`${c},${r}`, t);
+    this.gold -= spec.cost;
+    return t;
+  }
+  sellTower(t) {
+    this.towers.delete(`${t.col},${t.row}`);
+    const refund = Math.floor(t.spec.cost * CONFIG.SELL_RATIO);
+    this.gold += refund;
+    this.addFloater(`+${refund}G`, t.x, t.y, '#ffcb47');
+  }
+
+  /* ----- 웨이브 ----- */
+  startWave() {
+    if (this.waveActive || this.over) return;
+    this.wave++;
+    const w = this.wave;
+    const count = 6 + w * 2;
+    const queue = [];
+    for (let i = 0; i < count; i++) {
+      let type = 'normal';
+      const roll = Math.random();
+      if (w >= 4 && roll < 0.2) type = 'tank';
+      else if (w >= 2 && roll < 0.45) type = 'fast';
+      queue.push({ type, delay: type === 'fast' ? 0.45 : 0.8 });
+    }
+    if (w % 5 === 0) queue.push({ type: 'boss', delay: 1.5 });
+    this.spawnQueue = queue;
+    this.spawnTimer = 0.5;
+    this.hpMul = Math.pow(1.17, w - 1);
+    this.waveActive = true;
+  }
+
+  /* ----- 타겟팅 유틸 (Archetype들이 사용) ----- */
+  enemiesInRange(x, y, range) {
+    return this.enemies.filter((e) => !e.dead && Math.hypot(e.x - x, e.y - y) <= range + e.radius);
+  }
+  /** 사거리 내에서 경로상 가장 앞선 적 */
+  findTarget(x, y, range) {
+    let best = null;
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      if (Math.hypot(e.x - x, e.y - y) > range + e.radius) continue;
+      if (!best || e.dist > best.dist) best = e;
+    }
+    return best;
+  }
+  nearestEnemy(x, y, range, exclude) {
+    let best = null, bestD = range;
+    for (const e of this.enemies) {
+      if (e.dead || exclude.has(e)) continue;
+      const d = Math.hypot(e.x - x, e.y - y);
+      if (d <= bestD) { best = e; bestD = d; }
+    }
+    return best;
+  }
+
+  damageEnemy(e, dmg, tower) {
+    if (e.dead) return;
+    e.hp -= dmg;
+    if (e.hp <= 0) {
+      e.dead = true;
+      this.gold += e.reward;
+      if (tower) tower.kills++;
+    }
+  }
+  damageArea(x, y, r, dmg, tower) {
+    for (const e of this.enemiesInRange(x, y, r)) this.damageEnemy(e, dmg, tower);
+  }
+
+  spawnProjectile(tower, target, opts) { this.projectiles.push(new Projectile(tower, target, opts)); }
+  addEffect(fx) { this.effects.push({ ...fx, max: fx.ttl }); }
+  addFloater(text, x, y, color) { this.floaters.push({ text, x, y, color, ttl: 1, max: 1 }); }
+
+  /* ----- 메인 업데이트 ----- */
+  update(dt) {
+    if (this.over) return;
+
+    // 1) 스폰
+    if (this.waveActive && this.spawnQueue.length) {
+      this.spawnTimer -= dt;
+      if (this.spawnTimer <= 0) {
+        const next = this.spawnQueue.shift();
+        this.enemies.push(new Enemy(next.type, this.hpMul, this.path));
+        this.spawnTimer = next.delay;
+      }
+    }
+
+    // 2) 적 이동 / 도착 처리
+    for (const e of this.enemies) {
+      if (e.dead) continue;
+      e.update(dt);
+      if (e.reached) {
+        e.dead = true;
+        this.lives = Math.max(0, this.lives - e.leak);
+      }
+    }
+
+    // 3) 타워 공격 루프 (탐지 → 공격)
+    for (const t of this.towers.values()) t.update(this, dt);
+
+    // 4) 투사체
+    for (const p of this.projectiles) p.update(this, dt);
+    this.projectiles = this.projectiles.filter((p) => !p.done);
+
+    // 5) 정리 / 이펙트 수명
+    this.enemies = this.enemies.filter((e) => !e.dead);
+    for (const fx of this.effects) fx.ttl -= dt;
+    this.effects = this.effects.filter((fx) => fx.ttl > 0);
+    for (const f of this.floaters) { f.ttl -= dt; f.y -= 24 * dt; }
+    this.floaters = this.floaters.filter((f) => f.ttl > 0);
+
+    // 6) 웨이브 종료 / 게임 오버 판정
+    if (this.lives <= 0) { this.over = true; return; }
+    if (this.waveActive && !this.spawnQueue.length && !this.enemies.length) {
+      this.waveActive = false;
+      const bonus = 10 + this.wave * 3;
+      this.gold += bonus;
+      this.waveClearBonus = bonus;
+    }
+  }
+}
+
+
+/* =====================================================================
+ * 8. Renderer — Canvas 그리기
+ * ===================================================================== */
+const Renderer = (() => {
+  const canvas = document.getElementById('board');
+  const ctx = canvas.getContext('2d');
+  const C = CONFIG.CELL;
+
+  function drawGrid(game) {
+    for (let r = 0; r < CONFIG.ROWS; r++) {
+      for (let c = 0; c < CONFIG.COLS; c++) {
+        const onPath = game.path.cells.has(`${c},${r}`);
+        ctx.fillStyle = onPath ? '#5a4a35' : ((c + r) % 2 ? '#24402d' : '#284732');
+        ctx.fillRect(c * C, r * C, C, C);
+      }
+    }
+    // 경로 중앙선
+    ctx.strokeStyle = 'rgba(255,255,255,.08)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([6, 8]);
+    ctx.beginPath();
+    game.path.points.forEach((p, i) => (i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y)));
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  function drawRange(x, y, cells, color) {
+    if (!cells) return;
+    ctx.beginPath();
+    ctx.arc(x, y, cells * C, 0, Math.PI * 2);
+    ctx.fillStyle = color + '22';
+    ctx.fill();
+    ctx.strokeStyle = color + 'aa';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+
+  function drawTowerBody(x, y, word, color, archetype, aim, alpha = 1) {
+    ctx.save();
+    ctx.globalAlpha = alpha;
+    // 받침
+    ctx.fillStyle = '#1b1e2b';
+    roundRect(x - 20, y - 20, 40, 40, 8);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // 포신 (공격형만)
+    if (archetype !== 'income' && archetype !== 'slow') {
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(x, y);
+      ctx.lineTo(x + Math.cos(aim) * 18, y + Math.sin(aim) * 18);
+      ctx.stroke();
+    }
+    ctx.fillStyle = color;
+    ctx.beginPath();
+    ctx.arc(x, y, 9, 0, Math.PI * 2);
+    ctx.fill();
+    // 단어 라벨
+    const size = Math.min(12, Math.floor(76 / word.length));
+    ctx.font = `800 ${size}px system-ui, sans-serif`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = '#0b0d14';
+    ctx.fillRect(x - 22, y + 12, 44, size + 2);
+    ctx.fillStyle = '#fff';
+    ctx.fillText(word, x, y + 13 + size / 2);
+    ctx.restore();
+  }
+
+  function roundRect(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.moveTo(x + r, y);
+    ctx.arcTo(x + w, y, x + w, y + h, r);
+    ctx.arcTo(x + w, y + h, x, y + h, r);
+    ctx.arcTo(x, y + h, x, y, r);
+    ctx.arcTo(x, y, x + w, y, r);
+    ctx.closePath();
+  }
+
+  function drawEnemy(e) {
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, e.radius, 0, Math.PI * 2);
+    ctx.fillStyle = e.slowTimer > 0 ? '#7dd3fc' : e.color;
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(0,0,0,.5)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    // HP 바
+    const w = e.radius * 2 + 4, pct = Math.max(0, e.hp / e.maxHp);
+    ctx.fillStyle = '#111';
+    ctx.fillRect(e.x - w / 2, e.y - e.radius - 8, w, 4);
+    ctx.fillStyle = pct > 0.5 ? '#4ade80' : pct > 0.25 ? '#facc15' : '#f87171';
+    ctx.fillRect(e.x - w / 2, e.y - e.radius - 8, w * pct, 4);
+  }
+
+  function drawEffects(game) {
+    for (const fx of game.effects) {
+      const k = fx.ttl / fx.max; // 1 → 0
+      ctx.globalAlpha = k;
+      if (fx.kind === 'ring') {
+        ctx.beginPath();
+        ctx.arc(fx.x, fx.y, fx.r * (1.1 - k * 0.4), 0, Math.PI * 2);
+        ctx.strokeStyle = fx.color;
+        ctx.lineWidth = 3;
+        ctx.stroke();
+      } else if (fx.kind === 'bolt') {
+        ctx.strokeStyle = fx.color;
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        fx.points.forEach(([x, y], i) => {
+          const jx = i ? (Math.random() - 0.5) * 6 : 0, jy = i ? (Math.random() - 0.5) * 6 : 0;
+          i ? ctx.lineTo(x + jx, y + jy) : ctx.moveTo(x, y);
+        });
+        ctx.stroke();
+      }
+    }
+    ctx.globalAlpha = 1;
+    ctx.font = '700 13px system-ui, sans-serif';
+    ctx.textAlign = 'center';
+    for (const f of game.floaters) {
+      ctx.globalAlpha = Math.min(1, f.ttl * 2);
+      ctx.fillStyle = f.color;
+      ctx.fillText(f.text, f.x, f.y);
+    }
+    ctx.globalAlpha = 1;
+  }
+
+  return {
+    canvas,
+    draw(game, ui) {
+      drawGrid(game);
+
+      // 선택된 타워 사거리
+      if (ui.selected) drawRange(ui.selected.x, ui.selected.y, ui.selected.stats.range, ui.selected.color);
+
+      for (const t of game.towers.values()) drawTowerBody(t.x, t.y, t.word, t.color, t.spec.archetype, t.aim);
+      for (const e of game.enemies) drawEnemy(e);
+      for (const p of game.projectiles) {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = p.color;
+        ctx.fill();
+      }
+      drawEffects(game);
+
+      // 배치 대기 중인 타워 미리보기
+      if (ui.pending && ui.hover) {
+        const { c, r } = ui.hover;
+        const ok = game.isBuildable(c, r);
+        ctx.fillStyle = ok ? 'rgba(74,222,128,.25)' : 'rgba(248,113,113,.3)';
+        ctx.fillRect(c * C, r * C, C, C);
+        const x = c * C + C / 2, y = r * C + C / 2;
+        const spec = ui.pending.spec;
+        if (ok) drawRange(x, y, spec.stats.range, spec.color);
+        drawTowerBody(x, y, spec.word, spec.color, spec.archetype, -Math.PI / 2, 0.6);
+      }
+    },
+  };
+})();
+
+
+/* =====================================================================
+ * 9. UI — DOM 바인딩 / 입력
+ * ===================================================================== */
+const UI = (() => {
+  const $ = (id) => document.getElementById(id);
+  const el = {
+    wave: $('hudWave'), lives: $('hudLives'), gold: $('hudGold'), enemies: $('hudEnemies'),
+    btnWave: $('btnWave'), btnSpeed: $('btnSpeed'), btnConfirm: $('btnConfirm'),
+    btnClear: $('btnClear'), btnShuffle: $('btnShuffle'), btnReroll: $('btnReroll'),
+    slots: $('slots'), preview: $('preview'), rack: $('rack'), info: $('info'),
+    overlay: $('overlay'), overlayText: $('overlayText'), btnRestart: $('btnRestart'),
+  };
+
+  const state = {
+    game: null,
+    rack: [],          // Tile[] (길이 RACK_SIZE)
+    composition: [],   // 조합 중인 타일 id 순서
+    pending: null,     // { spec, tileIds } — 확정되어 배치를 기다리는 타워
+    selected: null,    // 선택된 Tower
+    hover: null,       // { c, r }
+    message: null,     // { html, ttl }
+  };
+
+  /* ----- 랙 관리 ----- */
+  const reservedIds = () => new Set(state.pending ? state.pending.tileIds : []);
+  const tileById = (id) => state.rack.find((t) => t.id === id);
+
+  /** 모음이 너무 적으면 사용 중이 아닌 자음 타일을 모음으로 교체 */
+  function ensureVowels() {
+    const locked = new Set([...state.composition, ...reservedIds()]);
+    const isVowel = (t) => LetterBag.VOWELS.includes(t.letter);
+    let vowels = state.rack.filter(isVowel).length;
+    const candidates = state.rack.filter((t) => !isVowel(t) && !locked.has(t.id));
+    while (vowels < CONFIG.MIN_VOWELS && candidates.length) {
+      const t = candidates.splice((Math.random() * candidates.length) | 0, 1)[0];
+      t.letter = LetterBag.drawVowel();
+      vowels++;
+    }
+  }
+
+  /** 지정한 타일들을 새 타일로 교체 (같은 슬롯 위치 유지) */
+  function replaceTiles(ids) {
+    const set = new Set(ids);
+    state.rack = state.rack.map((t) => (set.has(t.id) ? newTile() : t));
+    ensureVowels();
+  }
+
+  function composedWord() { return state.composition.map((id) => tileById(id).letter).join(''); }
+
+  /* ----- 조합 동작 ----- */
+  function addTile(id) {
+    if (state.composition.includes(id) || reservedIds().has(id)) return;
+    if (state.composition.length >= CONFIG.MAX_WORD_LEN) return;
+    state.composition.push(id);
+    renderComposer();
+  }
+  function removeAt(i) { state.composition.splice(i, 1); renderComposer(); }
+  function clearComposition() { state.composition = []; renderComposer(); }
+
+  /** 단어 확정: 검증 → 능력 해석 → 배치 대기 상태 */
+  function confirmWord() {
+    if (state.pending) return flash('먼저 대기 중인 타워를 배치하거나 취소하세요.', 'err');
+    const word = composedWord();
+    const result = WordValidator.validate(word);
+    if (!result.ok) return flash(result.reason, 'err');
+    const spec = AbilityRegistry.resolve(word);
+    if (state.game.gold < spec.cost) return flash(`골드가 부족합니다 (${spec.cost}G 필요)`, 'err');
+
+    state.pending = { spec, tileIds: [...state.composition] };
+    state.composition = [];
+    state.selected = null;
+    renderComposer();
+  }
+
+  function cancelPending() {
+    if (!state.pending) return;
+    state.pending = null;
+    renderComposer();
+  }
+
+  function placePending(c, r) {
+    const g = state.game;
+    const { spec, tileIds } = state.pending;
+    if (!g.isBuildable(c, r)) return flash('여기에는 배치할 수 없습니다.', 'err');
+    if (g.gold < spec.cost) return flash(`골드가 부족합니다 (${spec.cost}G 필요)`, 'err');
+    g.placeTower(spec, c, r);
+    state.pending = null;
+    replaceTiles(tileIds);       // 사용한 타일 소모 → 새 타일 보충
+    flash(`${spec.icon} <b>${spec.word}</b> ${spec.name} 배치!`, 'ok');
+    renderComposer();
+  }
+
+  function shuffleRack() {
+    for (let i = state.rack.length - 1; i > 0; i--) {
+      const j = (Math.random() * (i + 1)) | 0;
+      [state.rack[i], state.rack[j]] = [state.rack[j], state.rack[i]];
+    }
+    renderComposer();
+  }
+
+  function rerollRack() {
+    const g = state.game;
+    if (g.gold < CONFIG.REROLL_COST) return flash('골드가 부족합니다.', 'err');
+    const locked = reservedIds();
+    g.gold -= CONFIG.REROLL_COST;
+    state.composition = [];
+    replaceTiles(state.rack.filter((t) => !locked.has(t.id)).map((t) => t.id));
+    renderComposer();
+  }
+
+  /* ----- 메시지 ----- */
+  function flash(html, cls = '') {
+    state.message = { html: `<span class="${cls}">${html}</span>`, ttl: 2.5 };
+    renderInfo();
+  }
+
+  /* ----- 렌더 (DOM) ----- */
+  function tileHtml(t, extraClass = '') {
+    return `<button class="tile ${extraClass}" data-id="${t.id}">${t.letter}<span class="pts">${LetterBag.points(t.letter)}</span></button>`;
+  }
+
+  function renderComposer() {
+    const used = new Set(state.composition);
+    const reserved = reservedIds();
+
+    el.rack.innerHTML = state.rack
+      .map((t) => tileHtml(t, reserved.has(t.id) ? 'reserved' : used.has(t.id) ? 'used' : ''))
+      .join('');
+
+    el.slots.innerHTML = state.composition.length
+      ? state.composition.map((id, i) => tileHtml(tileById(id)).replace('data-id', `data-slot="${i}" data-id`)).join('')
+      : '<span class="hint">아래 타일을 눌러 단어를 만드세요</span>';
+
+    renderPreview();
+    renderInfo();
+  }
+
+  /** 실시간 미리보기: 검증 결과 + 해석된 능력 (랙 DOM은 건드리지 않음) */
+  function renderPreview() {
+    const word = composedWord();
+    if (state.pending) {
+      const s = state.pending.spec;
+      el.preview.innerHTML = `<span class="ok">${s.icon} <b>${s.word}</b> 배치 대기 중</span> — 맵의 빈 칸을 클릭하세요 (우클릭/Esc 취소)`;
+    } else if (!word) {
+      el.preview.innerHTML = '';
+    } else {
+      const v = WordValidator.validate(word);
+      if (!v.ok) {
+        el.preview.innerHTML = `<span class="err">${word} — ${v.reason}</span>`;
+      } else {
+        const s = AbilityRegistry.resolve(word);
+        el.preview.innerHTML = specSummary(s);
+      }
+    }
+    el.btnConfirm.disabled = !!state.pending || !word;
+  }
+
+  function specSummary(s) {
+    const badge = { exact: ['exact', '특수 단어'], tag: ['tag', `의미: ${s.tag}`], generic: ['', '일반 단어'] }[s.source];
+    const affordable = state.game.gold >= s.cost;
+    return `${s.icon} <b>${s.word}</b> <span class="badge ${badge[0]}">${badge[1]}</span> ` +
+      `${s.name} · ${s.desc} · <span class="${affordable ? 'ok' : 'err'}">${s.cost}G</span>`;
+  }
+
+  function renderInfo() {
+    const t = state.selected;
+    if (t) {
+      const s = t.spec, st = t.stats;
+      const parts = [];
+      if (st.damage) parts.push(`데미지 ${st.damage}`);
+      if (st.fireRate) parts.push(`공속 ${st.fireRate}/s`);
+      if (st.range) parts.push(`사거리 ${st.range.toFixed(1)}`);
+      if (st.slow) parts.push(`감속 ${Math.round(st.slow * 100)}%`);
+      if (st.chains) parts.push(`연쇄 ${st.chains}`);
+      if (st.splashRadius) parts.push(`폭발 ${st.splashRadius.toFixed(1)}`);
+      if (st.income) parts.push(`${st.interval}초당 ${st.income}G`);
+      parts.push(`처치 ${t.kills}`);
+      el.info.innerHTML =
+        `<span class="msg">${specSummary(s)}<br><small>${parts.join(' · ')}</small></span>` +
+        `<button class="danger" id="btnSell">판매 +${Math.floor(s.cost * CONFIG.SELL_RATIO)}G</button>`;
+      $('btnSell').onclick = () => { state.game.sellTower(t); state.selected = null; renderInfo(); };
+      return;
+    }
+    el.info.innerHTML = `<span class="msg">${state.message ? state.message.html : '타일로 단어를 만들고 맵에 타워를 배치하세요.'}</span>`;
+  }
+
+  function renderHud() {
+    const g = state.game;
+    el.wave.textContent = g.wave;
+    el.lives.textContent = g.lives;
+    el.gold.textContent = g.gold;
+    el.enemies.textContent = g.enemies.length + g.spawnQueue.length;
+    el.btnWave.disabled = g.waveActive || g.over;
+    el.btnWave.textContent = g.waveActive ? `웨이브 ${g.wave} 진행 중` : `웨이브 ${g.wave + 1} 시작`;
+    el.btnReroll.textContent = `새 타일 (${CONFIG.REROLL_COST}G)`;
+    el.btnReroll.disabled = g.gold < CONFIG.REROLL_COST;
+    el.btnSpeed.textContent = `속도 ${g.speed}x`;
+  }
+
+  /* ----- 캔버스 입력 ----- */
+  function cellFromEvent(ev) {
+    const rect = Renderer.canvas.getBoundingClientRect();
+    const sx = Renderer.canvas.width / rect.width, sy = Renderer.canvas.height / rect.height;
+    const x = (ev.clientX - rect.left) * sx, y = (ev.clientY - rect.top) * sy;
+    return { c: Math.floor(x / CONFIG.CELL), r: Math.floor(y / CONFIG.CELL) };
+  }
+
+  function bind() {
+    const cv = Renderer.canvas;
+    cv.addEventListener('mousemove', (ev) => { state.hover = cellFromEvent(ev); });
+    cv.addEventListener('mouseleave', () => { state.hover = null; });
+    cv.addEventListener('click', (ev) => {
+      const { c, r } = cellFromEvent(ev);
+      state.hover = { c, r };
+      if (state.pending) return placePending(c, r);
+      state.selected = state.game.towers.get(`${c},${r}`) ?? null;
+      renderInfo();
+    });
+    cv.addEventListener('contextmenu', (ev) => { ev.preventDefault(); cancelPending(); });
+
+    el.rack.addEventListener('click', (ev) => {
+      const b = ev.target.closest('.tile');
+      if (b) addTile(Number(b.dataset.id));
+    });
+    el.slots.addEventListener('click', (ev) => {
+      const b = ev.target.closest('.tile');
+      if (b) removeAt(Number(b.dataset.slot));
+    });
+
+    el.btnConfirm.onclick = confirmWord;
+    el.btnClear.onclick = clearComposition;
+    el.btnShuffle.onclick = shuffleRack;
+    el.btnReroll.onclick = rerollRack;
+    el.btnWave.onclick = () => state.game.startWave();
+    el.btnSpeed.onclick = () => { state.game.speed = state.game.speed === 1 ? 2 : state.game.speed === 2 ? 3 : 1; };
+    el.btnRestart.onclick = start;
+
+    // 키보드: 알파벳 → 해당 글자의 사용 가능한 첫 타일 선택
+    window.addEventListener('keydown', (ev) => {
+      if (ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      const k = ev.key;
+      if (/^[a-zA-Z]$/.test(k)) {
+        const L = k.toUpperCase();
+        const blocked = new Set([...state.composition, ...reservedIds()]);
+        const t = state.rack.find((t) => t.letter === L && !blocked.has(t.id));
+        if (t) addTile(t.id);
+      } else if (k === 'Backspace') {
+        ev.preventDefault();
+        if (state.composition.length) removeAt(state.composition.length - 1);
+      } else if (k === 'Enter') {
+        ev.preventDefault();
+        confirmWord();
+      } else if (k === 'Escape') {
+        if (state.pending) cancelPending();
+        else { state.selected = null; renderInfo(); }
+      }
+    });
+  }
+
+  /* ----- 시작 / 프레임 ----- */
+  function start() {
+    state.game = new Game();
+    state.rack = Array.from({ length: CONFIG.RACK_SIZE }, () => newTile());
+    state.composition = [];
+    state.pending = null;
+    state.selected = null;
+    state.message = null;
+    ensureVowels();
+    el.overlay.classList.remove('show');
+    renderComposer();
+  }
+
+  let lastGold = -1;
+  function frame(dt) {
+    const g = state.game;
+    if (state.message && (state.message.ttl -= dt) <= 0) { state.message = null; renderInfo(); }
+    if (state.selected && !g.towers.has(`${state.selected.col},${state.selected.row}`)) state.selected = null;
+    if (g.waveClearBonus) {
+      flash(`웨이브 ${g.wave} 클리어! 보너스 +${g.waveClearBonus}G`, 'ok');
+      g.waveClearBonus = 0;
+    }
+    // 골드가 바뀌면 비용 표시(초록/빨강)를 갱신
+    if (g.gold !== lastGold) { lastGold = g.gold; renderPreview(); }
+    if (g.over && !el.overlay.classList.contains('show')) {
+      el.overlayText.textContent = `GAME OVER — 웨이브 ${g.wave}`;
+      el.overlay.classList.add('show');
+    }
+    renderHud();
+  }
+
+  return { state, bind, start, frame };
+})();
+
+
+/* =====================================================================
+ * 10. Main loop
+ * ---------------------------------------------------------------------
+ *  고정 dt(최대 50ms)로 시뮬레이션하고, 배속은 update를 여러 번 호출해 구현.
+ *  (dt를 키우는 방식보다 투사체 터널링/충돌 누락이 적다)
+ * ===================================================================== */
+UI.bind();
+UI.start();
+
+let lastTime = performance.now();
+function loop(now) {
+  const dt = Math.min(0.05, (now - lastTime) / 1000);
+  lastTime = now;
+  const game = UI.state.game;
+  for (let i = 0; i < game.speed; i++) game.update(dt);
+  UI.frame(dt);
+  Renderer.draw(game, UI.state);
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+
+// 디버그/연동용 전역 노출 (콘솔에서 Lexicon.loadFromUrl('words.txt') 등 실행 가능)
+window.WordTD = { CONFIG, Lexicon, WordValidator, AbilityRegistry, Archetypes, UI };
 </script>
-</head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
-  </body>
+</body>
 </html>
